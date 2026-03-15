@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "482423255035",
+    "project_id": "homeservice-8c000",
+    "storage_bucket": "homeservice-8c000.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:482423255035:android:193fe4d9cf0b14e524a55e",
+        "android_client_info": {
+          "package_name": "com.helloteen.hello_teen"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "482423255035-30upin5414vo75rq2h5uig0r2bit8p8v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyChQ8tMAphKjFgsF18vcUEL-32NlfbT7cY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "482423255035-30upin5414vo75rq2h5uig0r2bit8p8v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
