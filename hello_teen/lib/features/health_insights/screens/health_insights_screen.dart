@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../mental_health/providers/mood_provider.dart';
 
@@ -50,7 +52,7 @@ class HealthInsightsScreen extends ConsumerWidget {
                             Text('Health Insights 📊',
                                 style: GoogleFonts.poppins(
                                     fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
-                            Text('Your wellness trends at a glance',
+                            Text('AI-powered wellness trends',
                                 style: GoogleFonts.poppins(fontSize: 13, color: Colors.white70)),
                           ],
                         ),
@@ -68,6 +70,8 @@ class HealthInsightsScreen extends ConsumerWidget {
             sliver: moodLogsAsync.when(
               data: (logs) => SliverList(
                 delegate: SliverChildListDelegate([
+                  _AiInsightCard(logs: logs),
+                  const SizedBox(height: 24),
                   _buildSummaryRow(context, logs),
                   const SizedBox(height: 28),
                   Text('Mood Trends (Last 14 Days)',
@@ -111,7 +115,7 @@ class HealthInsightsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSummaryRow(BuildContext context, List<dynamic> logs) {
+  Widget _buildSummaryRow(BuildContext context, List<MoodLog> logs) {
     final totalLogs = logs.length;
     double avgMood = 0;
     int positiveDays = 0;
@@ -173,7 +177,7 @@ class HealthInsightsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildMoodLineChart(BuildContext context, List<dynamic> logs) {
+  Widget _buildMoodLineChart(BuildContext context, List<MoodLog> logs) {
     if (logs.isEmpty) return _emptyChart(context, 'No mood data yet. Start logging!');
     final recentLogs = logs.length > 14 ? logs.sublist(logs.length - 14) : logs;
     final spots = <FlSpot>[];
@@ -248,7 +252,7 @@ class HealthInsightsScreen extends ConsumerWidget {
     ).animate().fadeIn(duration: 500.ms, delay: 200.ms);
   }
 
-  Widget _buildMoodBarChart(BuildContext context, List<dynamic> logs) {
+  Widget _buildMoodBarChart(BuildContext context, List<MoodLog> logs) {
     if (logs.isEmpty) return _emptyChart(context, 'Log moods to see distribution');
 
     final moodCounts = <String, int>{'Happy': 0, 'Excited': 0, 'Calm': 0, 'Anxious': 0, 'Sad': 0};
@@ -323,7 +327,7 @@ class HealthInsightsScreen extends ConsumerWidget {
     ).animate().fadeIn(duration: 500.ms, delay: 300.ms);
   }
 
-  Widget _buildWellnessScore(List<dynamic> logs) {
+  Widget _buildWellnessScore(List<MoodLog> logs) {
     double score = 50;
     if (logs.isNotEmpty) {
       final recentLogs = logs.length > 7 ? logs.sublist(logs.length - 7) : logs;
@@ -415,5 +419,159 @@ class HealthInsightsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Insight Card
+// ─────────────────────────────────────────────────────────────────────────────
+class _AiInsightCard extends StatefulWidget {
+  final List<MoodLog> logs;
+
+  const _AiInsightCard({required this.logs});
+
+  @override
+  State<_AiInsightCard> createState() => _AiInsightCardState();
+}
+
+class _AiInsightCardState extends State<_AiInsightCard> {
+  String? _insight;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _generateInsight();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AiInsightCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.logs != widget.logs) {
+      _generateInsight();
+    }
+  }
+
+  Future<void> _generateInsight() async {
+    if (widget.logs.isEmpty) {
+      setState(() => _insight = "You haven't logged any moods recently. Start tracking to receive personalized AI insights! 📊");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final apiKey = dotenv.env['GEMINI_API_KEY'];
+      if (apiKey == null || apiKey.isEmpty || apiKey == 'PASTE_YOUR_GEMINI_API_KEY_HERE') {
+        setState(() {
+          _insight = "Gemini API key is missing. Please add it to your .env file to enable AI insights.";
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final recentLogs = widget.logs.length > 14 ? widget.logs.sublist(widget.logs.length - 14) : widget.logs;
+      final logStrings = recentLogs.map((l) => 'Date: ${l.timestamp.toIso8601String().split('T')[0]}, Mood: ${l.mood} (${l.moodLevel}/5)').join('; ');
+
+      final model = GenerativeModel(
+        model: 'gemini-3.1-flash-lite-preview',
+        apiKey: apiKey,
+        systemInstruction: Content.system('''
+You are an empathetic, encouraging AI wellness coach for teenagers.
+Given a list of recent mood logs, provide a short 2-3 sentence personalized insight.
+Highlight any patterns, validate their feelings, and offer a tiny word of encouragement.
+Use friendly emojis. Keep it very conversational and warm. Do NOT give medical advice.
+'''),
+      );
+
+      final response = await model.generateContent([
+        Content.text('Here are my recent mood logs: $logStrings. Please give me an insight on my mood trends.')
+      ]);
+
+      setState(() {
+        _insight = response.text?.trim() ?? "You're doing great! Keep tracking your moods.";
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _insight = "Could not generate insight right now. Please try again later. 💕";
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFF7C7CF8).withOpacity(0.3), width: 1.5),
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF7C7CF8).withOpacity(0.12),
+            const Color(0xFFFF6B9A).withOpacity(0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF7C7CF8).withOpacity(0.15),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF5C35D4), size: 18),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'AI Wellness Insight',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF5C35D4),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (_isLoading)
+            Row(
+              children: [
+                const SizedBox(
+                  width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF7C7CF8)),
+                ),
+                const SizedBox(width: 12),
+                Text('Analyzing your trends...', style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textLight)),
+              ],
+            )
+          else
+            Text(
+              _insight ?? '',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                color: AppColors.textMain,
+                height: 1.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ).animate().fadeIn(duration: 400.ms),
+        ],
+      ),
+    ).animate().scale(begin: const Offset(0.95, 0.95), duration: 400.ms, curve: Curves.easeOut);
   }
 }

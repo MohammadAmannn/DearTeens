@@ -11,7 +11,10 @@ class HelloTeenApp extends StatelessWidget {
       title: 'DearTeens',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.values.firstWhere((mode) => mode.name == 'light', orElse: () => ThemeMode.light), // Supports both light/dark based on system
+      themeMode: ThemeMode.values.firstWhere(
+        (mode) => mode.name == 'light',
+        orElse: () => ThemeMode.light,
+      ), // Supports both light/dark based on system
       debugShowCheckedModeBanner: false,
       home: const SplashScreen(),
     );
